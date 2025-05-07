@@ -1,131 +1,107 @@
-/**
- * Sample React Native App
- * https://github.com/facebook/react-native
- *
- * @format
- */
+import React, { useEffect, useState } from 'react';
+import { View, Text, StyleSheet, Button, Alert, Platform } from 'react-native';
+import * as RNIap from 'react-native-iap';
 
-import React from 'react';
-import type {PropsWithChildren} from 'react';
-import {
-  ScrollView,
-  StatusBar,
-  StyleSheet,
-  Text,
-  useColorScheme,
-  View,
-} from 'react-native';
+const itemSkus = Platform.select({
+  android: ['com.myapp.monthly_699'], // Your test subscription product ID
+  ios: [],
+});
 
-import {
-  Colors,
-  DebugInstructions,
-  Header,
-  LearnMoreLinks,
-  ReloadInstructions,
-} from 'react-native/Libraries/NewAppScreen';
+const App: React.FC = () => {
+  const [products, setProducts] = useState<RNIap.Subscription[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
 
-type SectionProps = PropsWithChildren<{
-  title: string;
-}>;
+  useEffect(() => {
+    const initIAP = async () => {
+      try {
+        await RNIap.initConnection();
+        console.log('Connected to store ✅');
 
-function Section({children, title}: SectionProps): React.JSX.Element {
-  const isDarkMode = useColorScheme() === 'dark';
-  return (
-    <View style={styles.sectionContainer}>
-      <Text
-        style={[
-          styles.sectionTitle,
-          {
-            color: isDarkMode ? Colors.white : Colors.black,
-          },
-        ]}>
-        {title}
-      </Text>
-      <Text
-        style={[
-          styles.sectionDescription,
-          {
-            color: isDarkMode ? Colors.light : Colors.dark,
-          },
-        ]}>
-        {children}
-      </Text>
-    </View>
-  );
-}
+        const subs = await RNIap.getSubscriptions({ skus: itemSkus || [] });
+        console.log('Available subscriptions:', subs);
+        setProducts(subs);
+      } catch (err) {
+        console.warn('IAP error', err);
+        Alert.alert('Error', 'Failed to connect to billing service.');
+      } finally {
+        setLoading(false);
+      }
+    };
 
-function App(): React.JSX.Element {
-  const isDarkMode = useColorScheme() === 'dark';
+    initIAP();
 
-  const backgroundStyle = {
-    backgroundColor: isDarkMode ? Colors.darker : Colors.lighter,
+    return () => {
+      RNIap.endConnection();
+    };
+  }, []);
+
+  const requestSubscription = async (sku: string) => {
+    try {
+      await RNIap.requestSubscription({ sku });
+    } catch (error: any) {
+      console.warn('Purchase error', error);
+      Alert.alert('Error', 'Failed to start purchase flow.');
+    }
   };
 
-  /*
-   * To keep the template simple and small we're adding padding to prevent view
-   * from rendering under the System UI.
-   * For bigger apps the recommendation is to use `react-native-safe-area-context`:
-   * https://github.com/AppAndFlow/react-native-safe-area-context
-   *
-   * You can read more about it here:
-   * https://github.com/react-native-community/discussions-and-proposals/discussions/827
-   */
-  const safePadding = '5%';
-
   return (
-    <View style={backgroundStyle}>
-      <StatusBar
-        barStyle={isDarkMode ? 'light-content' : 'dark-content'}
-        backgroundColor={backgroundStyle.backgroundColor}
-      />
-      <ScrollView
-        style={backgroundStyle}>
-        <View style={{paddingRight: safePadding}}>
-          <Header/>
+    <View style={styles.container}>
+      <Text style={styles.title}>🛠️ IAP Demo - Subscription Tester</Text>
+      <Text style={styles.subtitle}>Welcome to your test app for in-app purchases!</Text>
+
+      {loading && <Text>🔄 Loading subscriptions from Play Store...</Text>}
+
+      {!loading && products.length === 0 && (
+        <View style={styles.messageBox}>
+          <Text style={styles.warning}>⚠️ No subscriptions available</Text>
+          <Text style={styles.note}>
+            This usually happens when:
+            {'\n'}- The product is not approved yet
+            {'\n'}- The Play Store is still syncing
+            {'\n'}- Your SKU is incorrect
+          </Text>
         </View>
-        <View
-          style={{
-            backgroundColor: isDarkMode ? Colors.black : Colors.white,
-            paddingHorizontal: safePadding,
-            paddingBottom: safePadding,
-          }}>
-          <Section title="Step One">
-            Edit <Text style={styles.highlight}>App.tsx</Text> to change this
-            screen and then come back to see your edits.
-          </Section>
-          <Section title="See Your Changes">
-            <ReloadInstructions />
-          </Section>
-          <Section title="Debug">
-            <DebugInstructions />
-          </Section>
-          <Section title="Learn More">
-            Read the docs to discover what to do next:
-          </Section>
-          <LearnMoreLinks />
-        </View>
-      </ScrollView>
+      )}
+
+      {!loading &&
+        products.map((product) => {
+          const formattedPrice =
+            Platform.OS === 'android'
+              ? (product as RNIap.SubscriptionAndroid)
+                  ?.subscriptionOfferDetails?.[0]?.pricingPhases?.pricingPhaseList?.[0]
+                  ?.formattedPrice ?? '₹--'
+              : '₹--';
+
+          return (
+            <View key={product.productId} style={styles.productBox}>
+              <Text style={styles.productTitle}>{product.title}</Text>
+              <Text>{product.description}</Text>
+              <Text style={styles.price}>{formattedPrice}</Text>
+              <Button title="Buy Subscription" onPress={() => requestSubscription(product.productId)} />
+            </View>
+          );
+        })}
     </View>
   );
-}
+};
 
 const styles = StyleSheet.create({
-  sectionContainer: {
-    marginTop: 32,
-    paddingHorizontal: 24,
+  container: { flex: 1, padding: 20, justifyContent: 'center', alignItems: 'center' },
+  title: { fontSize: 22, fontWeight: 'bold', marginBottom: 10 },
+  subtitle: { fontSize: 14, color: '#444', marginBottom: 20, textAlign: 'center' },
+  productBox: {
+    marginTop: 20,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: '#ccc',
+    borderRadius: 10,
+    width: '100%',
   },
-  sectionTitle: {
-    fontSize: 24,
-    fontWeight: '600',
-  },
-  sectionDescription: {
-    marginTop: 8,
-    fontSize: 18,
-    fontWeight: '400',
-  },
-  highlight: {
-    fontWeight: '700',
-  },
+  productTitle: { fontSize: 16, fontWeight: 'bold', marginBottom: 4 },
+  price: { fontSize: 14, color: 'green', marginTop: 8 },
+  messageBox: { marginTop: 20, alignItems: 'center' },
+  warning: { fontSize: 16, fontWeight: 'bold', color: 'red' },
+  note: { fontSize: 13, color: '#555', marginTop: 6, textAlign: 'center' },
 });
 
 export default App;
