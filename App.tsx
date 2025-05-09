@@ -3,8 +3,8 @@ import { View, Text, StyleSheet, Button, Alert, Platform } from 'react-native';
 import * as RNIap from 'react-native-iap';
 
 const itemSkus = Platform.select({
-  android: ['com.myapp.monthly_699'], // Your test subscription product ID
-  ios: [],
+  android: ['com.myapp.monthly_699'],
+  ios: ['com.myapp.monthly_699'], // 👈 Add your actual iOS product ID here if different
 });
 
 const App: React.FC = () => {
@@ -29,7 +29,6 @@ const App: React.FC = () => {
     };
 
     initIAP();
-
     return () => {
       RNIap.endConnection();
     };
@@ -46,10 +45,10 @@ const App: React.FC = () => {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>🛠️ IAP Demo - Subscription Tester</Text>
+      <Text style={styles.title}>IAP Demo - Subscription Tester</Text>
       <Text style={styles.subtitle}>Welcome to your test app for in-app purchases!</Text>
 
-      {loading && <Text>🔄 Loading subscriptions from Play Store...</Text>}
+      {loading && <Text>🔄 Loading subscriptions from {Platform.OS === 'ios' ? 'App Store' : 'Play Store'}...</Text>}
 
       {!loading && products.length === 0 && (
         <View style={styles.messageBox}>
@@ -57,7 +56,7 @@ const App: React.FC = () => {
           <Text style={styles.note}>
             This usually happens when:
             {'\n'}- The product is not approved yet
-            {'\n'}- The Play Store is still syncing
+            {'\n'}- The store is still syncing
             {'\n'}- Your SKU is incorrect
           </Text>
         </View>
@@ -70,7 +69,7 @@ const App: React.FC = () => {
               ? (product as RNIap.SubscriptionAndroid)
                   ?.subscriptionOfferDetails?.[0]?.pricingPhases?.pricingPhaseList?.[0]
                   ?.formattedPrice ?? '₹--'
-              : '₹--';
+              : (product as RNIap.SubscriptionIOS)?.localizedPrice ?? '$--';
 
           return (
             <View key={product.productId} style={styles.productBox}>
